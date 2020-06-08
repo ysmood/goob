@@ -3,18 +3,20 @@ package goob_test
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/ysmood/goob"
 )
 
 func ExampleNew() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel() // stop all the background goroutines
+	ob := goob.New()
 
-	ob := goob.New(ctx)
+	ctx, unsubscribe := context.WithCancel(context.Background())
+	defer unsubscribe()
 	s := ob.Subscribe(ctx)
 
 	go func() {
@@ -41,7 +43,7 @@ func TestNew(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ob := goob.New(ctx)
+	ob := goob.New()
 	s := ob.Subscribe(ctx)
 	size := 10000
 
@@ -64,11 +66,23 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestUnsubscribe(t *testing.T) {
+	ob := goob.New()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ob.Subscribe(ctx)
+	cancel()
+
+	time.Sleep(10 * time.Millisecond)
+
+	assert.Equal(t, runtime.NumGoroutine(), 2)
+}
+
 func TestMultipleConsumers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ob := goob.New(ctx)
+	ob := goob.New()
 	s1 := ob.Subscribe(ctx)
 	s2 := ob.Subscribe(ctx)
 	s3 := ob.Subscribe(ctx)
@@ -119,7 +133,7 @@ func TestEach(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ob := goob.New(ctx)
+	ob := goob.New()
 	s := ob.Subscribe(ctx)
 	size := 100
 
@@ -144,7 +158,7 @@ func TestMap(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ob := goob.New(ctx)
+	ob := goob.New()
 	s := ob.Map(ctx, func(e int) int {
 		return e * 2
 	}).Subscribe(ctx)
@@ -168,7 +182,7 @@ func TestFilter(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ob := goob.New(ctx)
+	ob := goob.New()
 	s := ob.Filter(ctx, func(e int) bool {
 		return e%2 == 0
 	}).Subscribe(ctx)

@@ -18,7 +18,7 @@ func Each(s chan Event, iteratee interface{}) {
 
 // Map events
 func (ob *Observable) Map(ctx context.Context, iteratee interface{}) *Observable {
-	mapped := New(ctx)
+	mapped := New()
 	s := ob.Subscribe(ctx)
 
 	go func() {
@@ -34,7 +34,7 @@ func (ob *Observable) Map(ctx context.Context, iteratee interface{}) *Observable
 
 // Filter events
 func (ob *Observable) Filter(ctx context.Context, iteratee interface{}) *Observable {
-	filterred := New(ctx)
+	filterred := New()
 	s := ob.Subscribe(ctx)
 
 	go func() {
