@@ -46,6 +46,11 @@ func (ob *Observable) Publish(e Event) {
 	}
 }
 
+// Count of the subscribers
+func (ob *Observable) Count() int {
+	return len(ob.subscribers)
+}
+
 // Subscribe message, the ctx is used to cancel the subscription
 func (ob *Observable) Subscribe(ctx context.Context) chan Event {
 	s := &subscriber{
@@ -59,11 +64,18 @@ func (ob *Observable) Subscribe(ctx context.Context) chan Event {
 	ch := make(chan Event)
 
 	go func() {
+		defer func() {
+			close(ch)
+
+			ob.lock.Lock()
+			delete(ob.subscribers, s)
+			ob.lock.Unlock()
+		}()
+
 		ticked := true
 		wait := time.Nanosecond
 		for {
 			if ctx.Err() != nil {
-				close(ch)
 				break
 			}
 

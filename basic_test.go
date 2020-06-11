@@ -76,6 +76,7 @@ func TestUnsubscribe(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	assert.Equal(t, runtime.NumGoroutine(), 2)
+	assert.Equal(t, ob.Count(), 0)
 }
 
 func TestMultipleConsumers(t *testing.T) {
