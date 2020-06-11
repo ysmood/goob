@@ -17,9 +17,6 @@ type Observable struct {
 	lock sync.Mutex
 
 	subscribers map[*subscriber]null
-
-	produce   chan Event
-	subscribe chan *subscriber
 }
 
 // Subscriber object
@@ -32,8 +29,6 @@ type subscriber struct {
 func New() *Observable {
 	ob := &Observable{
 		subscribers: map[*subscriber]null{},
-		produce:     make(chan Event),
-		subscribe:   make(chan *subscriber),
 	}
 
 	return ob
