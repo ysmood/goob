@@ -2,9 +2,7 @@ package goob
 
 import (
 	"context"
-	"runtime"
 	"sync"
-	"time"
 )
 
 // Event interface
@@ -22,6 +20,7 @@ type Observable struct {
 // Subscriber object
 type subscriber struct {
 	lock   sync.Mutex
+	wait   chan null
 	buffer []Event
 }
 
@@ -40,9 +39,21 @@ func (ob *Observable) Publish(e Event) {
 	defer ob.lock.Unlock()
 
 	for s := range ob.subscribers {
+		var wait chan null
+
 		s.lock.Lock()
 		s.buffer = append(s.buffer, e)
+		wait = s.wait
+		if wait != nil {
+			s.wait = nil
+		}
 		s.lock.Unlock()
+
+		if wait != nil {
+			noPanic(func() {
+				wait <- null{}
+			})
+		}
 	}
 }
 
@@ -72,35 +83,30 @@ func (ob *Observable) Subscribe(ctx context.Context) chan Event {
 			ob.lock.Unlock()
 		}()
 
-		ticked := true
-		wait := time.Nanosecond
 		for {
 			if ctx.Err() != nil {
 				break
 			}
 
+			var wait chan null
+
 			s.lock.Lock()
 			list := s.buffer
 			s.buffer = []Event{}
+			if len(list) == 0 {
+				s.wait = make(chan null)
+				wait = s.wait
+			}
 			s.lock.Unlock()
 
 			if len(list) == 0 {
-				// to reduce the overhead use the go scheduler first, then use the syscall sleep
-				if ticked {
-					ticked = false
-					runtime.Gosched()
-					continue
+				select {
+				case <-ctx.Done():
+					close(wait)
+					break
+				case <-wait:
 				}
-
-				// backoff
-				if wait < time.Millisecond {
-					wait *= 2
-				}
-				time.Sleep(wait)
-				continue
 			}
-			ticked = true
-			wait = time.Nanosecond
 
 			for _, e := range list {
 				ch <- e

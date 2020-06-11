@@ -1,10 +1,10 @@
 # Overview
 
-A lightweight observable lib.
+A lightweight observable lib. The problem of go channel is that is doesn't support unlimited buffer size,
+it's a pain to decide what size to use, this lib will dynamically handle it.
 
+- unlimited buffer size
 - one publisher to multiple subscribers
 - thread-safe
 - subscribers never block each other
 - publishing order is the same as listening order
-
-The trade-off is the subscribers may delay sometime (between 1ns to 1ms) when new events come.

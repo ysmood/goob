@@ -3,14 +3,18 @@ package goob_test
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/ysmood/goob"
 )
+
+type null struct{}
 
 func ExampleNew() {
 	ob := goob.New()
@@ -49,7 +53,7 @@ func TestNew(t *testing.T) {
 
 	expected := []int{}
 	go func() {
-		for i := range make([]int, size) {
+		for i := range make([]null, size) {
 			expected = append(expected, i)
 			ob.Publish(i)
 		}
@@ -91,8 +95,9 @@ func TestMultipleConsumers(t *testing.T) {
 
 	expected := []int{}
 	go func() {
-		for i := range make([]int, size) {
+		for i := range make([]null, size) {
 			expected = append(expected, i)
+			time.Sleep(time.Duration(rand.Intn(100)) * time.Nanosecond)
 			ob.Publish(i)
 		}
 	}()
@@ -140,7 +145,7 @@ func TestEach(t *testing.T) {
 
 	expected := []int{}
 	go func() {
-		for i := range make([]int, size) {
+		for i := range make([]null, size) {
 			expected = append(expected, i)
 			ob.Publish(i)
 		}
@@ -202,4 +207,88 @@ func TestFilter(t *testing.T) {
 	})
 
 	assert.Equal(t, []int{2, 4}, result)
+}
+
+func TestMonkey(t *testing.T) {
+	wg := sync.WaitGroup{}
+	count := int32(0)
+	roundSize := 10000
+	size := 100
+
+	run := func() {
+		wg.Add(1)
+		defer wg.Done()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ob := goob.New()
+		s := ob.Subscribe(ctx)
+
+		go func() {
+			for range make([]null, size) {
+				time.Sleep(time.Duration(rand.Intn(100)) * time.Nanosecond)
+				ob.Publish(nil)
+			}
+		}()
+
+		wait := make(chan null)
+		go func() {
+			for i := range make([]null, size) {
+				time.Sleep(time.Duration(rand.Intn(100)) * time.Nanosecond)
+
+				<-s
+
+				atomic.AddInt32(&count, 1)
+
+				if i == size-1 {
+					wait <- null{}
+				}
+			}
+		}()
+		<-wait
+	}
+
+	for range make([]null, roundSize) {
+		go run()
+	}
+
+	wg.Wait()
+
+	assert.EqualValues(t, roundSize*size, count)
+}
+
+func BenchmarkPublish(b *testing.B) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ob := goob.New()
+	s := ob.Subscribe(ctx)
+
+	go func() {
+		for range s {
+		}
+	}()
+
+	for i := 0; i < b.N; i++ {
+		ob.Publish(nil)
+	}
+}
+
+func BenchmarkConsume(b *testing.B) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ob := goob.New()
+	s := ob.Subscribe(ctx)
+
+	for i := 0; i < b.N; i++ {
+		ob.Publish(nil)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		<-s
+	}
 }
