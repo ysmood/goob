@@ -8,3 +8,7 @@ it's a pain to decide what size to use, this lib will dynamically handle it.
 - thread-safe
 - subscribers never block each other
 - publishing order is the same as listening order
+
+## Examples
+
+See [examples_test.go](examples_test.go).

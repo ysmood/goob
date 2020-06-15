@@ -2,7 +2,6 @@ package goob_test
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"runtime"
 	"sync"
@@ -15,33 +14,6 @@ import (
 )
 
 type null struct{}
-
-func ExampleNew() {
-	ob := goob.New()
-
-	ctx, unsubscribe := context.WithCancel(context.Background())
-	defer unsubscribe()
-	s := ob.Subscribe(ctx)
-
-	go func() {
-		ob.Publish(1)
-		ob.Publish(2)
-		ob.Publish(3)
-	}()
-
-	for e := range s {
-		fmt.Println(e)
-
-		if e.(int) == 3 {
-			break
-		}
-	}
-
-	// Output:
-	// 1
-	// 2
-	// 3
-}
 
 func TestNew(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
