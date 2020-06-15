@@ -20,7 +20,7 @@ jobs:
 
     - name: test
       run: |
-        go get github.com/ysmood/kit/cmd/godev
+        (cd ~ && GO111MODULE=on go get github.com/ysmood/kit/cmd/godev)
         godev -l -m 100
 
     - uses: codecov/codecov-action@v1

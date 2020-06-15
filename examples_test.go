@@ -33,14 +33,11 @@ func Example_basic() {
 		}
 	}
 
-	// s2 consume events
-	for e := range s2 {
-		fmt.Print(e)
-
-		if e.(int) == 3 {
-			break
-		}
-	}
+	// s2 consume events with goob.Each helper, it will auto cast the type
+	goob.Each(s2, func(i int) bool {
+		fmt.Print(i)
+		return i == 3
+	})
 
 	// Output: 123123
 }
