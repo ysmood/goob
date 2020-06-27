@@ -63,7 +63,7 @@ func (ob *Observable) Count() int {
 }
 
 // Subscribe message, the ctx is used to cancel the subscription
-func (ob *Observable) Subscribe(ctx context.Context) chan Event {
+func (ob *Observable) Subscribe(ctx context.Context) <-chan Event {
 	s := &subscriber{
 		buffer: []Event{},
 	}

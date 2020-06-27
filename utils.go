@@ -6,7 +6,7 @@ import (
 )
 
 // Each event, if iteratee returns true, the iteration will stop
-func Each(s chan Event, iteratee interface{}) {
+func Each(s <-chan Event, iteratee interface{}) {
 	for e := range s {
 		fnVal := reflect.ValueOf(iteratee)
 		ret := fnVal.Call([]reflect.Value{reflect.ValueOf(e)})
