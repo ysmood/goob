@@ -85,7 +85,7 @@ func (ob *Observable) Subscribe(ctx context.Context) chan Event {
 
 		for {
 			if ctx.Err() != nil {
-				break
+				return
 			}
 
 			var wait chan null
@@ -103,13 +103,17 @@ func (ob *Observable) Subscribe(ctx context.Context) chan Event {
 				select {
 				case <-ctx.Done():
 					close(wait)
-					break
+					return
 				case <-wait:
 				}
 			}
 
 			for _, e := range list {
-				ch <- e
+				select {
+				case <-ctx.Done():
+					return
+				case ch <- e:
+				}
 			}
 		}
 	}()

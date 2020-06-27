@@ -3,7 +3,6 @@ package goob_test
 import (
 	"context"
 	"math/rand"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -11,9 +10,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/ysmood/goob"
+	"go.uber.org/goleak"
 )
 
 type null struct{}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestNew(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -51,7 +55,6 @@ func TestUnsubscribe(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	assert.Equal(t, runtime.NumGoroutine(), 2)
 	assert.Equal(t, ob.Count(), 0)
 }
 
