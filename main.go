@@ -61,6 +61,8 @@ func (ob *Observable) Publish(e Event) {
 
 // Count of the subscribers
 func (ob *Observable) Count() int {
+	ob.lock.Lock()
+	defer ob.lock.Unlock()
 	return len(ob.subscribers)
 }
 

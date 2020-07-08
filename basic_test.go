@@ -25,7 +25,7 @@ func TestNew(t *testing.T) {
 
 	ob := goob.New()
 	s := ob.Subscribe(ctx)
-	size := 10000
+	size := 1000
 
 	expected := []int{}
 	go func() {
@@ -66,7 +66,7 @@ func TestMultipleConsumers(t *testing.T) {
 	s1 := ob.Subscribe(ctx)
 	s2 := ob.Subscribe(ctx)
 	s3 := ob.Subscribe(ctx)
-	size := 10000
+	size := 1000
 
 	expected := []int{}
 	go func() {
@@ -187,7 +187,7 @@ func TestFilter(t *testing.T) {
 func TestMonkey(t *testing.T) {
 	wg := sync.WaitGroup{}
 	count := int32(0)
-	roundSize := 10000
+	roundSize := 1000
 	size := 100
 
 	run := func() {
