@@ -20,6 +20,7 @@ type Observable struct {
 // Subscriber object
 type subscriber struct {
 	lock   sync.Mutex
+	ctx    context.Context
 	wait   chan null
 	buffer []Event
 }
@@ -50,9 +51,10 @@ func (ob *Observable) Publish(e Event) {
 		s.lock.Unlock()
 
 		if wait != nil {
-			noPanic(func() {
-				wait <- null{}
-			})
+			select {
+			case <-s.ctx.Done():
+			case wait <- null{}:
+			}
 		}
 	}
 }
@@ -65,6 +67,7 @@ func (ob *Observable) Count() int {
 // Subscribe message, the ctx is used to cancel the subscription
 func (ob *Observable) Subscribe(ctx context.Context) <-chan Event {
 	s := &subscriber{
+		ctx:    ctx,
 		buffer: []Event{},
 	}
 
@@ -102,7 +105,6 @@ func (ob *Observable) Subscribe(ctx context.Context) <-chan Event {
 			if len(list) == 0 {
 				select {
 				case <-ctx.Done():
-					close(wait)
 					return
 				case <-wait:
 				}

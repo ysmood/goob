@@ -49,11 +49,3 @@ func (ob *Observable) Filter(ctx context.Context, iteratee interface{}) *Observa
 
 	return filterred
 }
-
-func noPanic(fn func()) {
-	defer func() {
-		_ = recover()
-	}()
-
-	fn()
-}
