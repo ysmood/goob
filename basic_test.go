@@ -267,3 +267,24 @@ func BenchmarkConsume(b *testing.B) {
 		<-s
 	}
 }
+
+func BenchmarkEach(b *testing.B) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ob := goob.New()
+	s := ob.Subscribe(ctx)
+
+	for i := 0; i < b.N; i++ {
+		ob.Publish(1)
+	}
+
+	b.ResetTimer()
+
+	i := 0
+	goob.Each(s, func(e int) bool {
+		i++
+		stop := i >= b.N
+		return stop
+	})
+}
