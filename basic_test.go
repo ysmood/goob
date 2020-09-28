@@ -3,23 +3,23 @@ package goob_test
 import (
 	"context"
 	"math/rand"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/ysmood/goob"
-	"go.uber.org/goleak"
+	"github.com/ysmood/got/pkg/testleak"
 )
 
-type null struct{}
-
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	testleak.CheckMain(m, 0)
 }
 
 func TestNew(t *testing.T) {
+	testleak.Check(t, 0)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -43,10 +43,12 @@ func TestNew(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, expected, result)
+	eq(t, expected, result)
 }
 
 func TestUnsubscribe(t *testing.T) {
+	testleak.Check(t, 0)
+
 	ob := goob.New()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -55,10 +57,12 @@ func TestUnsubscribe(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	assert.Equal(t, ob.Count(), 0)
+	eq(t, ob.Count(), 0)
 }
 
 func TestMultipleConsumers(t *testing.T) {
+	testleak.Check(t, 0)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -106,11 +110,13 @@ func TestMultipleConsumers(t *testing.T) {
 
 	wg.Wait()
 
-	assert.Equal(t, expected, r1)
-	assert.Equal(t, expected, r2)
+	eq(t, expected, r1)
+	eq(t, expected, r2)
 }
 
 func TestEach(t *testing.T) {
+	testleak.Check(t, 0)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -132,10 +138,12 @@ func TestEach(t *testing.T) {
 		return len(result) == size
 	})
 
-	assert.Equal(t, expected, result)
+	eq(t, expected, result)
 }
 
 func TestMap(t *testing.T) {
+	testleak.Check(t, 0)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -156,10 +164,12 @@ func TestMap(t *testing.T) {
 		return len(result) == 3
 	})
 
-	assert.Equal(t, []int{2, 4, 6}, result)
+	eq(t, []int{2, 4, 6}, result)
 }
 
 func TestFilter(t *testing.T) {
+	testleak.Check(t, 0)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -181,10 +191,12 @@ func TestFilter(t *testing.T) {
 		return len(result) == 2
 	})
 
-	assert.Equal(t, []int{2, 4}, result)
+	eq(t, []int{2, 4}, result)
 }
 
 func TestMonkey(t *testing.T) {
+	testleak.Check(t, 0)
+
 	wg := sync.WaitGroup{}
 	count := int32(0)
 	roundSize := 1000
@@ -230,7 +242,7 @@ func TestMonkey(t *testing.T) {
 
 	wg.Wait()
 
-	assert.EqualValues(t, roundSize*size, count)
+	eq(t, roundSize*size, int(count))
 }
 
 func BenchmarkPublish(b *testing.B) {
@@ -287,4 +299,12 @@ func BenchmarkEach(b *testing.B) {
 		stop := i >= b.N
 		return stop
 	})
+}
+
+type null struct{}
+
+func eq(t *testing.T, expected, actual interface{}) {
+	if !reflect.DeepEqual(expected, actual) {
+		t.Error(expected, "not equal", actual)
+	}
 }

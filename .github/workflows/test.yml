@@ -14,13 +14,10 @@ jobs:
 
     - uses: actions/setup-go@v2
       with:
-        go-version: 1.14
+        go-version: 1.15
 
     - uses: actions/checkout@v2
 
-    - name: test
-      run: |
-        (cd ~ && GO111MODULE=on go get github.com/ysmood/kit/cmd/godev)
-        godev -l -m 100
+    - run: (cd ~ && GO111MODULE=on go get github.com/ysmood/kit/cmd/godev)
 
-    - uses: codecov/codecov-action@v1
+    - run: godev -l -m 100
