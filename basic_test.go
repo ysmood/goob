@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/ysmood/goob"
-	"github.com/ysmood/got/pkg/testleak"
+	"github.com/ysmood/gotrace/pkg/testleak"
 )
 
 func TestMain(m *testing.M) {
