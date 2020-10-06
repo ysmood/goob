@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/ysmood/goob"
+	"github.com/ysmood/gotrace"
 	"github.com/ysmood/gotrace/pkg/testleak"
 )
 
 func TestMain(m *testing.M) {
-	testleak.CheckMain(m, 0)
+	testleak.CheckMain(m, 0, gotrace.IgnoreCurrent())
 }
 
 func TestNew(t *testing.T) {
@@ -114,6 +115,22 @@ func TestMultipleConsumers(t *testing.T) {
 	eq(t, expected, r2)
 }
 
+func TestSlowConsumer(t *testing.T) {
+	testleak.Check(t, 0)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ob := goob.New()
+	s := ob.Subscribe(ctx)
+
+	ob.Publish(1)
+
+	time.Sleep(20 * time.Millisecond)
+
+	<-s
+}
+
 func TestEach(t *testing.T) {
 	testleak.Check(t, 0)
 
@@ -197,13 +214,14 @@ func TestFilter(t *testing.T) {
 func TestMonkey(t *testing.T) {
 	testleak.Check(t, 0)
 
-	wg := sync.WaitGroup{}
 	count := int32(0)
-	roundSize := 1000
+	roundSize := 100
 	size := 100
 
+	wg := sync.WaitGroup{}
+	wg.Add(roundSize)
+
 	run := func() {
-		wg.Add(1)
 		defer wg.Done()
 
 		ctx, cancel := context.WithCancel(context.Background())

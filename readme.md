@@ -7,7 +7,7 @@ it's a pain to decide what size to use, this lib will handle it dynamically.
 - one publisher to multiple subscribers
 - thread-safe
 - subscribers never block each other
-- publishing order is the same as listening order
+- stable event order
 
 ## Examples
 
