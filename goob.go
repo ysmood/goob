@@ -1,21 +1,23 @@
 package goob
 
 import (
-	"context"
 	"sync"
 )
 
 // Observable hub
 type Observable struct {
 	lock        *sync.Mutex
-	subscribers map[*func(Event)]struct{}
+	subscribers map[Subscriber]*Pipe
 }
+
+// Subscriber type
+type Subscriber <-chan Event
 
 // New observable instance
 func New() *Observable {
 	ob := &Observable{
 		lock:        &sync.Mutex{},
-		subscribers: map[*func(Event)]struct{}{},
+		subscribers: map[Subscriber]*Pipe{},
 	}
 	return ob
 }
@@ -25,31 +27,51 @@ func (ob *Observable) Publish(e Event) {
 	ob.lock.Lock()
 	defer ob.lock.Unlock()
 
-	for write := range ob.subscribers {
-		(*write)(e)
+	for _, p := range ob.subscribers {
+		p.Write(e)
 	}
 }
 
-// Subscribe message, the ctx is used to cancel the subscription
-func (ob *Observable) Subscribe(ctx context.Context) <-chan Event {
+// Subscribe message
+func (ob *Observable) Subscribe() Subscriber {
 	ob.lock.Lock()
 	defer ob.lock.Unlock()
 
-	s, r := Pipe(ctx)
+	p := NewPipe()
 
-	ob.subscribers[&s] = struct{}{}
-	go func() {
-		<-ctx.Done()
-		ob.lock.Lock()
-		defer ob.lock.Unlock()
-		delete(ob.subscribers, &s)
-	}()
+	if ob.subscribers == nil {
+		p.Stop()
+	} else {
+		ob.subscribers[p.Events] = p
+	}
 
-	return r
+	return p.Events
 }
 
-// Count of the subscribers
-func (ob *Observable) Count() int {
+// Unsubscribe from observable
+func (ob *Observable) Unsubscribe(s Subscriber) {
+	ob.lock.Lock()
+	defer ob.lock.Unlock()
+	if p, has := ob.subscribers[s]; has {
+		p.Stop()
+		delete(ob.subscribers, s)
+	}
+}
+
+// Close subscribers
+func (ob *Observable) Close() {
+	ob.lock.Lock()
+	defer ob.lock.Unlock()
+
+	for _, p := range ob.subscribers {
+		p.Stop()
+	}
+
+	ob.subscribers = nil
+}
+
+// Len of the subscribers
+func (ob *Observable) Len() int {
 	ob.lock.Lock()
 	defer ob.lock.Unlock()
 	return len(ob.subscribers)

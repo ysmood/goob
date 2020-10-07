@@ -1,7 +1,6 @@
 package goob_test
 
 import (
-	"context"
 	"sync"
 	"testing"
 
@@ -9,25 +8,23 @@ import (
 )
 
 func TestPipe(t *testing.T) {
-	// testleak.Check(t, 0)
+	checkLeak(t)
 
 	const pipeCount = 10
 	const msgCount = 10
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	round := func() {
-		w, r := goob.Pipe(ctx)
+		p := goob.NewPipe()
+		defer p.Stop()
 
 		wg := sync.WaitGroup{}
 		wg.Add(msgCount)
 		for i := 0; i < msgCount*2; i++ {
 			if i%2 == 0 {
-				go w(i)
+				go p.Write(i)
 			} else {
 				go func() {
-					<-r
+					<-p.Events
 					wg.Done()
 				}()
 			}
@@ -47,14 +44,13 @@ func TestPipe(t *testing.T) {
 }
 
 func TestPipeCancel(t *testing.T) {
-	// testleak.Check(t, 0)
+	checkLeak(t)
 
-	const count = 100
+	const count = 1000
 
 	for i := 0; i < count; i++ {
-		ctx, cancel := context.WithCancel(context.Background())
-		w, _ := goob.Pipe(ctx)
-		go w(1)
-		go cancel()
+		p := goob.NewPipe()
+		go p.Write(1)
+		go p.Stop()
 	}
 }

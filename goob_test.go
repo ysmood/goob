@@ -1,7 +1,6 @@
 package goob_test
 
 import (
-	"context"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -12,18 +11,24 @@ import (
 	"github.com/ysmood/goob"
 )
 
-func TestMain(m *testing.M) {
-	// testleak.CheckMain(m, 0, gotrace.IgnoreCurrent())
+func checkLeak(t *testing.T) {
+	// testleak.Check(t, 0)
+}
+
+type null struct{}
+
+func eq(t *testing.T, expected, actual interface{}) {
+	if !reflect.DeepEqual(expected, actual) {
+		t.Error(expected, "not equal", actual)
+	}
 }
 
 func TestNew(t *testing.T) {
-	// testleak.Check(t, 0)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	checkLeak(t)
 
 	ob := goob.New()
-	s := ob.Subscribe(ctx)
+	defer ob.Close()
+	s := ob.Subscribe()
 	size := 1000
 
 	expected := []int{}
@@ -38,7 +43,7 @@ func TestNew(t *testing.T) {
 	for msg := range s {
 		result = append(result, msg.(int))
 		if len(result) == size {
-			cancel()
+			break
 		}
 	}
 
@@ -46,29 +51,39 @@ func TestNew(t *testing.T) {
 }
 
 func TestUnsubscribe(t *testing.T) {
-	// testleak.Check(t, 0)
+	checkLeak(t)
 
 	ob := goob.New()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	ob.Subscribe(ctx)
-	cancel()
+	s := ob.Subscribe()
+	ob.Unsubscribe(s)
 
 	time.Sleep(10 * time.Millisecond)
 
-	eq(t, ob.Count(), 0)
+	eq(t, ob.Len(), 0)
+}
+
+func TestClosed(t *testing.T) {
+	checkLeak(t)
+
+	ob := goob.New()
+	ob.Close()
+
+	s := ob.Subscribe()
+	_, ok := <-s
+
+	eq(t, ok, false)
+	eq(t, ob.Len(), 0)
 }
 
 func TestMultipleConsumers(t *testing.T) {
-	// testleak.Check(t, 0)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	checkLeak(t)
 
 	ob := goob.New()
-	s1 := ob.Subscribe(ctx)
-	s2 := ob.Subscribe(ctx)
-	s3 := ob.Subscribe(ctx)
+	defer ob.Close()
+	s1 := ob.Subscribe()
+	s2 := ob.Subscribe()
+	s3 := ob.Subscribe()
 	size := 1000
 
 	expected := []int{}
@@ -114,13 +129,11 @@ func TestMultipleConsumers(t *testing.T) {
 }
 
 func TestSlowConsumer(t *testing.T) {
-	// testleak.Check(t, 0)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	checkLeak(t)
 
 	ob := goob.New()
-	s := ob.Subscribe(ctx)
+	defer ob.Close()
+	s := ob.Subscribe()
 
 	ob.Publish(1)
 
@@ -129,91 +142,11 @@ func TestSlowConsumer(t *testing.T) {
 	<-s
 }
 
-func TestEach(t *testing.T) {
-	// testleak.Check(t, 0)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ob := goob.New()
-	s := ob.Subscribe(ctx)
-	size := 100
-
-	expected := []int{}
-	go func() {
-		for i := range make([]null, size) {
-			expected = append(expected, i)
-			ob.Publish(i)
-		}
-	}()
-
-	result := []int{}
-	goob.Each(s, func(e int) bool {
-		result = append(result, e)
-		return len(result) == size
-	})
-
-	eq(t, expected, result)
-}
-
-func TestMap(t *testing.T) {
-	// testleak.Check(t, 0)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ob := goob.New()
-	s := ob.Map(ctx, func(e int) int {
-		return e * 2
-	}).Subscribe(ctx)
-
-	go func() {
-		ob.Publish(1)
-		ob.Publish(2)
-		ob.Publish(3)
-	}()
-
-	result := []int{}
-	goob.Each(s, func(e int) bool {
-		result = append(result, e)
-		return len(result) == 3
-	})
-
-	eq(t, []int{2, 4, 6}, result)
-}
-
-func TestFilter(t *testing.T) {
-	// testleak.Check(t, 0)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ob := goob.New()
-	s := ob.Filter(ctx, func(e int) bool {
-		return e%2 == 0
-	}).Subscribe(ctx)
-
-	go func() {
-		ob.Publish(1)
-		ob.Publish(2)
-		ob.Publish(3)
-		ob.Publish(4)
-	}()
-
-	result := []int{}
-	goob.Each(s, func(e int) bool {
-		result = append(result, e)
-		return len(result) == 2
-	})
-
-	eq(t, []int{2, 4}, result)
-}
-
 func TestMonkey(t *testing.T) {
-	// testleak.Check(t, 0)
+	checkLeak(t)
 
 	count := int32(0)
-	roundSize := 100
+	roundSize := 2
 	size := 100
 
 	wg := sync.WaitGroup{}
@@ -222,11 +155,9 @@ func TestMonkey(t *testing.T) {
 	run := func() {
 		defer wg.Done()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		ob := goob.New()
-		s := ob.Subscribe(ctx)
+		defer ob.Close()
+		s := ob.Subscribe()
 
 		go func() {
 			for range make([]null, size) {
@@ -262,11 +193,9 @@ func TestMonkey(t *testing.T) {
 }
 
 func BenchmarkPublish(b *testing.B) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	ob := goob.New()
-	s := ob.Subscribe(ctx)
+	defer ob.Close()
+	s := ob.Subscribe()
 
 	go func() {
 		for range s {
@@ -279,11 +208,9 @@ func BenchmarkPublish(b *testing.B) {
 }
 
 func BenchmarkConsume(b *testing.B) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	ob := goob.New()
-	s := ob.Subscribe(ctx)
+	defer ob.Close()
+	s := ob.Subscribe()
 
 	for i := 0; i < b.N; i++ {
 		ob.Publish(nil)
@@ -293,34 +220,5 @@ func BenchmarkConsume(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		<-s
-	}
-}
-
-func BenchmarkEach(b *testing.B) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ob := goob.New()
-	s := ob.Subscribe(ctx)
-
-	for i := 0; i < b.N; i++ {
-		ob.Publish(1)
-	}
-
-	b.ResetTimer()
-
-	i := 0
-	goob.Each(s, func(e int) bool {
-		i++
-		stop := i >= b.N
-		return stop
-	})
-}
-
-type null struct{}
-
-func eq(t *testing.T, expected, actual interface{}) {
-	if !reflect.DeepEqual(expected, actual) {
-		t.Error(expected, "not equal", actual)
 	}
 }
