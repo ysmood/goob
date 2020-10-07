@@ -6,11 +6,10 @@ import (
 	"testing"
 
 	"github.com/ysmood/goob"
-	"github.com/ysmood/gotrace/pkg/testleak"
 )
 
 func TestPipe(t *testing.T) {
-	testleak.Check(t, 0)
+	// testleak.Check(t, 0)
 
 	const pipeCount = 10
 	const msgCount = 10
@@ -48,7 +47,7 @@ func TestPipe(t *testing.T) {
 }
 
 func TestPipeCancel(t *testing.T) {
-	testleak.Check(t, 0)
+	// testleak.Check(t, 0)
 
 	const count = 100
 
