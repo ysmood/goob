@@ -3,6 +3,7 @@ package goob_test
 import (
 	"math/rand"
 	"reflect"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -67,10 +68,14 @@ func TestClosed(t *testing.T) {
 	checkLeak(t)
 
 	ob := goob.New()
+	ob.Subscribe()
 	ob.Close()
 
 	s := ob.Subscribe()
 	_, ok := <-s
+
+	ob.Publish(1)
+	ob.Unsubscribe(s)
 
 	eq(t, ok, false)
 	eq(t, ob.Len(), 0)
@@ -146,8 +151,8 @@ func TestMonkey(t *testing.T) {
 	checkLeak(t)
 
 	count := int32(0)
-	roundSize := 2
-	size := 100
+	roundSize := 20
+	size := 1000
 
 	wg := sync.WaitGroup{}
 	wg.Add(roundSize)
@@ -197,14 +202,20 @@ func BenchmarkPublish(b *testing.B) {
 	defer ob.Close()
 	s := ob.Subscribe()
 
-	go func() {
-		for range s {
-		}
-	}()
-
-	for i := 0; i < b.N; i++ {
-		ob.Publish(nil)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go func() {
+			for range s {
+			}
+		}()
 	}
+
+	b.ResetTimer()
+
+	b.RunParallel(func(p *testing.PB) {
+		for p.Next() {
+			ob.Publish(nil)
+		}
+	})
 }
 
 func BenchmarkConsume(b *testing.B) {
