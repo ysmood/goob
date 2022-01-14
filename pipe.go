@@ -19,14 +19,15 @@ type Pipe struct {
 func NewPipe() *Pipe {
 	events := make(chan Event)
 	lock := sync.Mutex{}
-	buf := []Event{}
+	buf := []Event{} // using slice is faster than linked-list in general cases
 	wait := make(chan struct{}, 1)
 	stop := make(chan struct{})
 
 	write := func(e Event) {
 		lock.Lock()
+		defer lock.Unlock()
+
 		buf = append(buf, e)
-		lock.Unlock()
 
 		if len(wait) == 0 {
 			select {
