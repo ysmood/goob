@@ -14,10 +14,14 @@ jobs:
 
     - uses: actions/setup-go@v2
       with:
-        go-version: 1.15
+        go-version: 1.17
 
     - uses: actions/checkout@v2
 
-    - run: (cd ~ && GO111MODULE=on go get github.com/ysmood/kit/cmd/godev)
+    - name: lint
+      run: go run github.com/ysmood/golangci-lint@latest
 
-    - run: godev -r -l -m 100
+    - name: test
+      run: |
+        go test -race -coverprofile=coverage.out ./...
+        go run github.com/ysmood/got/cmd/check-cov@latest
