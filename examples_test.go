@@ -1,17 +1,21 @@
 package goob_test
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/ysmood/goob"
 )
 
 func Example_basic() {
-	// create an observable instance
-	ob := goob.New()
-	defer ob.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
 
-	events := ob.Subscribe()
+	// create an observable instance
+	ob := goob.New(ctx)
+
+	events := ob.Subscribe(context.TODO())
 
 	// publish events without blocking
 	ob.Publish(1)
@@ -21,10 +25,6 @@ func Example_basic() {
 	// consume events
 	for e := range events {
 		fmt.Print(e)
-
-		if e.(int) == 3 {
-			break
-		}
 	}
 
 	// Output: 123

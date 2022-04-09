@@ -1,6 +1,7 @@
 package goob_test
 
 import (
+	"context"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -10,10 +11,11 @@ import (
 	"time"
 
 	"github.com/ysmood/goob"
+	"github.com/ysmood/gotrace"
 )
 
 func checkLeak(t *testing.T) {
-	// testleak.Check(t, 0)
+	gotrace.CheckLeak(t, 0)
 }
 
 type null struct{}
@@ -27,9 +29,11 @@ func eq(t *testing.T, expected, actual interface{}) {
 func TestNew(t *testing.T) {
 	checkLeak(t)
 
-	ob := goob.New()
-	defer ob.Close()
-	s := ob.Subscribe()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer t.Cleanup(cancel)
+
+	ob := goob.New(ctx)
+	s := ob.Subscribe(ctx)
 	size := 1000
 
 	expected := []int{}
@@ -51,31 +55,31 @@ func TestNew(t *testing.T) {
 	eq(t, expected, result)
 }
 
-func TestUnsubscribe(t *testing.T) {
+func TestCancel(t *testing.T) {
 	checkLeak(t)
 
-	ob := goob.New()
+	ob := goob.New(context.Background())
 
-	s := ob.Subscribe()
-	ob.Unsubscribe(s)
-
+	ctx, cancel := context.WithCancel(context.Background())
+	ob.Subscribe(ctx)
+	cancel()
 	time.Sleep(10 * time.Millisecond)
-
 	eq(t, ob.Len(), 0)
 }
 
 func TestClosed(t *testing.T) {
 	checkLeak(t)
 
-	ob := goob.New()
-	ob.Subscribe()
-	ob.Close()
+	ctx, cancel := context.WithCancel(context.Background())
 
-	s := ob.Subscribe()
+	ob := goob.New(ctx)
+	ob.Subscribe(ctx)
+	cancel()
+
+	s := ob.Subscribe(context.Background())
 	_, ok := <-s
 
 	ob.Publish(1)
-	ob.Unsubscribe(s)
 
 	eq(t, ok, false)
 	eq(t, ob.Len(), 0)
@@ -84,11 +88,13 @@ func TestClosed(t *testing.T) {
 func TestMultipleConsumers(t *testing.T) {
 	checkLeak(t)
 
-	ob := goob.New()
-	defer ob.Close()
-	s1 := ob.Subscribe()
-	s2 := ob.Subscribe()
-	s3 := ob.Subscribe()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer t.Cleanup(cancel)
+
+	ob := goob.New(ctx)
+	s1 := ob.Subscribe(ctx)
+	s2 := ob.Subscribe(ctx)
+	s3 := ob.Subscribe(ctx)
 	size := 1000
 
 	expected := []int{}
@@ -136,9 +142,11 @@ func TestMultipleConsumers(t *testing.T) {
 func TestSlowConsumer(t *testing.T) {
 	checkLeak(t)
 
-	ob := goob.New()
-	defer ob.Close()
-	s := ob.Subscribe()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer t.Cleanup(cancel)
+
+	ob := goob.New(ctx)
+	s := ob.Subscribe(ctx)
 
 	ob.Publish(1)
 
@@ -160,9 +168,11 @@ func TestMonkey(t *testing.T) {
 	run := func() {
 		defer wg.Done()
 
-		ob := goob.New()
-		defer ob.Close()
-		s := ob.Subscribe()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ob := goob.New(ctx)
+		s := ob.Subscribe(ctx)
 
 		go func() {
 			for range make([]null, size) {
@@ -198,9 +208,11 @@ func TestMonkey(t *testing.T) {
 }
 
 func BenchmarkPublish(b *testing.B) {
-	ob := goob.New()
-	defer ob.Close()
-	s := ob.Subscribe()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer b.Cleanup(cancel)
+
+	ob := goob.New(ctx)
+	s := ob.Subscribe(ctx)
 
 	for i := 0; i < runtime.NumCPU(); i++ {
 		go func() {
@@ -219,9 +231,11 @@ func BenchmarkPublish(b *testing.B) {
 }
 
 func BenchmarkConsume(b *testing.B) {
-	ob := goob.New()
-	defer ob.Close()
-	s := ob.Subscribe()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer b.Cleanup(cancel)
+
+	ob := goob.New(ctx)
+	s := ob.Subscribe(ctx)
 
 	for i := 0; i < b.N; i++ {
 		ob.Publish(nil)

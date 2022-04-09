@@ -1,6 +1,7 @@
 package goob_test
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -11,19 +12,22 @@ import (
 func TestPipeOrder(t *testing.T) {
 	checkLeak(t)
 
-	p := goob.NewPipe()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 
-	p.Write(1)
-	p.Write(2)
-	p.Write(3)
+	write, events := goob.NewPipe(ctx)
 
-	if 1 != <-p.Events {
+	write(1)
+	write(2)
+	write(3)
+
+	if 1 != <-events {
 		t.Fatal()
 	}
-	if 2 != <-p.Events {
+	if 2 != <-events {
 		t.Fatal()
 	}
-	if 3 != <-p.Events {
+	if 3 != <-events {
 		t.Fatal()
 	}
 }
@@ -35,17 +39,19 @@ func TestPipe(t *testing.T) {
 	const msgCount = 10
 
 	round := func() {
-		p := goob.NewPipe()
-		defer p.Stop()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		write, events := goob.NewPipe(ctx)
 
 		wg := sync.WaitGroup{}
 		wg.Add(msgCount)
 		for i := 0; i < msgCount*2; i++ {
 			if i%2 == 0 {
-				go p.Write(i)
+				go write(i)
 			} else {
 				go func() {
-					<-p.Events
+					<-events
 					wg.Done()
 				}()
 			}
@@ -64,9 +70,24 @@ func TestPipe(t *testing.T) {
 	wg.Wait()
 }
 
+func TestPipeCancel(t *testing.T) {
+	checkLeak(t)
+
+	const count = 1000
+
+	for i := 0; i < count; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		write, _ := goob.NewPipe(ctx)
+		go write(1)
+		go cancel()
+	}
+}
+
 func TestPipeMonkey(t *testing.T) {
-	p := goob.NewPipe()
-	t.Cleanup(p.Stop)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	write, events := goob.NewPipe(ctx)
 
 	round := 30
 	count := 10000
@@ -74,25 +95,13 @@ func TestPipeMonkey(t *testing.T) {
 	for i := 0; i < round; i++ {
 		go func() {
 			for i := 0; i < count; i++ {
-				p.Write(i)
+				write(i)
 			}
 		}()
 	}
 
 	for i := 0; i < count*round; i++ {
 		time.Sleep(100 * time.Nanosecond)
-		<-p.Events
-	}
-}
-
-func TestPipeCancel(t *testing.T) {
-	checkLeak(t)
-
-	const count = 1000
-
-	for i := 0; i < count; i++ {
-		p := goob.NewPipe()
-		go p.Write(1)
-		go p.Stop()
+		<-events
 	}
 }

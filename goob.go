@@ -1,23 +1,23 @@
 package goob
 
 import (
+	"context"
 	"sync"
 )
 
 // Observable hub
 type Observable struct {
+	ctx         context.Context
 	lock        *sync.Mutex
-	subscribers map[Subscriber]*Pipe
+	subscribers map[Events]func(Event)
 }
 
-// Subscriber type
-type Subscriber <-chan Event
-
 // New observable instance
-func New() *Observable {
+func New(ctx context.Context) *Observable {
 	ob := &Observable{
+		ctx:         ctx,
 		lock:        &sync.Mutex{},
-		subscribers: map[Subscriber]*Pipe{},
+		subscribers: map[Events]func(Event){},
 	}
 	return ob
 }
@@ -27,47 +27,36 @@ func (ob *Observable) Publish(e Event) {
 	ob.lock.Lock()
 	defer ob.lock.Unlock()
 
-	for _, p := range ob.subscribers {
-		p.Write(e)
+	for _, write := range ob.subscribers {
+		write(e)
 	}
 }
 
 // Subscribe message
-func (ob *Observable) Subscribe() Subscriber {
+func (ob *Observable) Subscribe(ctx context.Context) Events {
 	ob.lock.Lock()
 	defer ob.lock.Unlock()
 
-	p := NewPipe()
+	ctx, cancel := context.WithCancel(ctx)
 
-	if ob.subscribers == nil {
-		p.Stop()
-	} else {
-		ob.subscribers[p.Events] = p
-	}
+	write, events := NewPipe(ctx)
 
-	return p.Events
-}
+	ob.subscribers[events] = write
 
-// Unsubscribe from observable
-func (ob *Observable) Unsubscribe(s Subscriber) {
-	ob.lock.Lock()
-	defer ob.lock.Unlock()
-	if p, has := ob.subscribers[s]; has {
-		p.Stop()
-		delete(ob.subscribers, s)
-	}
-}
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-ob.ctx.Done():
+		}
 
-// Close subscribers
-func (ob *Observable) Close() {
-	ob.lock.Lock()
-	defer ob.lock.Unlock()
+		ob.lock.Lock()
+		defer ob.lock.Unlock()
 
-	for _, p := range ob.subscribers {
-		p.Stop()
-	}
+		delete(ob.subscribers, events)
+		cancel()
+	}()
 
-	ob.subscribers = nil
+	return events
 }
 
 // Len of the subscribers

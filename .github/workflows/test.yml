@@ -1,8 +1,12 @@
 name: Test
+
 on:
   push:
 
   pull_request:
+
+env:
+  GODEBUG: tracebackancestors=1000
 
 jobs:
 
